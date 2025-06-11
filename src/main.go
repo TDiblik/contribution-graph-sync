@@ -2,10 +2,11 @@ package main
 
 import (
 	"log"
+	"time"
 )
 
 func main() {
-	if err := SetupENV("./env", "../.env"); err != nil {
+	if err := SetupENV(); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -14,12 +15,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	lastRecordedDate, err := GetLastRecordedDate()
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	for {
+		lastRecordedDate, err := GetLastRecordedDate()
+		if err != nil {
+			log.Fatalln(err)
+		}
+
 		events, err := GetEvents(user.Id, *lastRecordedDate)
 		if err != nil {
 			log.Fatalln(err)
@@ -46,6 +47,7 @@ func main() {
 				log.Println("not handled: ", event.ActionName)
 			}
 		}
+		time.Sleep(time.Millisecond * 500) // give the API some rest :D (prevents rate-limiting + random HTTP 500 codes)
 	}
 }
 
@@ -57,4 +59,6 @@ func HandleMultipleCommits(event ProjectEvent, commiterEmail string) {
 	for _, commit := range *commitsBetween {
 		CreateGitCommit("created a commit", commit.AuthoredDate)
 	}
+	SetLastRecordedDate(event.CreatedAt)
+	time.Sleep(time.Millisecond * 500) // give the API some rest :D (prevents rate-limiting + random HTTP 500 codes)
 }
