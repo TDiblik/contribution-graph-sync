@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	if err := SetupENV(); err != nil {
+	if err := SetupENV("./env", "../.env"); err != nil {
 		log.Fatalln(err)
 	}
 
