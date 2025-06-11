@@ -40,12 +40,11 @@ func CreateGitCommit(message string, date time.Time) {
 	if _, err := fileHandle.Write(fmt.Appendln(nil, date.Format("2006-01-02 15:04:05 CET")+":", message)); err != nil {
 		log.Fatal(err)
 	}
-
-	dateStr := date.Format(time.RFC3339)
-	if err := os.WriteFile(lastRecordedDateFileName(), []byte(dateStr), 0644); err != nil {
+	if err := SetLastRecordedDate(date); err != nil {
 		log.Fatal(err)
 	}
 
+	dateStr := date.Format(time.RFC3339)
 	runGit([]string{"add", "."}, nil, EnvData.GL_TARGET_SYNC_REPO)
 	runGit([]string{"commit", "-m", fmt.Sprintf("sync: %s", date.Format("2006-01-02 15:04:05 CET"))},
 		[]string{

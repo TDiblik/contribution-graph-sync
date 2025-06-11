@@ -15,7 +15,6 @@ import (
 type IEnvData struct {
 	GL_API_TOKEN        string
 	GL_TARGET_SYNC_REPO string
-	CLONE_DIR           string
 }
 
 var EnvData IEnvData
@@ -36,7 +35,6 @@ func SetupENV(env_files ...string) error {
 	if stat, err := os.Stat(EnvData.GL_TARGET_SYNC_REPO); err != nil || !stat.IsDir() {
 		return fmt.Errorf("GL_TARGET_SYNC_REPO does not exist: %v", err)
 	}
-	EnvData.CLONE_DIR = os.TempDir()
 
 	log.Println("Setting up env variables: end")
 	return nil
@@ -64,6 +62,14 @@ func GetLastRecordedDate() (*time.Time, error) {
 
 	date, err := time.Parse(time.RFC3339, strings.TrimSpace(string(data)))
 	return &date, err
+}
+
+func SetLastRecordedDate(newDate time.Time) error {
+	dateStr := newDate.Format(time.RFC3339)
+	if err := os.WriteFile(lastRecordedDateFileName(), []byte(dateStr), 0644); err != nil {
+		return err
+	}
+	return nil
 }
 
 func lastRecordedDateFileName() string {
