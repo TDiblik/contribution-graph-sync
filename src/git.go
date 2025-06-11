@@ -48,7 +48,7 @@ func CreateGitCommit(message string, dateRaw time.Time) {
 
 	dateStr := date.Format(time.RFC3339)
 	runGit([]string{"add", "."}, nil, EnvData.GL_TARGET_SYNC_REPO)
-	runGit([]string{"commit", "-m", fmt.Sprintf("sync: %s", date.Format(DateDateFormatLayout))},
+	runGit([]string{"commit", "-m", fmt.Sprintf("[sync] %s", date.Format(DateDateFormatLayout))},
 		[]string{
 			"GIT_AUTHOR_DATE=" + dateStr,
 			"GIT_COMMITTER_DATE=" + dateStr,
