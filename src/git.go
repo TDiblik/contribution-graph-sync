@@ -21,7 +21,9 @@ func runGit(args []string, envVars []string, dir string) {
 	}
 }
 
-func CreateGitCommit(message string, date time.Time) {
+func CreateGitCommit(message string, dateRaw time.Time) {
+	date := UtcToCet(dateRaw)
+
 	var fileHandle *os.File
 	filePath := path.Join(EnvData.GL_TARGET_SYNC_REPO, date.Format(time.DateOnly)+".txt")
 	if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
@@ -37,7 +39,7 @@ func CreateGitCommit(message string, date time.Time) {
 	}
 	defer fileHandle.Close()
 
-	if _, err := fileHandle.Write(fmt.Appendln(nil, date.Format("2006-01-02 15:04:05 CET")+":", message)); err != nil {
+	if _, err := fileHandle.Write(fmt.Appendln(nil, date.Format(DateDateFormatLayout)+":", message)); err != nil {
 		log.Fatal(err)
 	}
 	if err := SetLastRecordedDate(date); err != nil {
@@ -46,7 +48,7 @@ func CreateGitCommit(message string, date time.Time) {
 
 	dateStr := date.Format(time.RFC3339)
 	runGit([]string{"add", "."}, nil, EnvData.GL_TARGET_SYNC_REPO)
-	runGit([]string{"commit", "-m", fmt.Sprintf("sync: %s", date.Format("2006-01-02 15:04:05 CET"))},
+	runGit([]string{"commit", "-m", fmt.Sprintf("sync: %s", date.Format(DateDateFormatLayout))},
 		[]string{
 			"GIT_AUTHOR_DATE=" + dateStr,
 			"GIT_COMMITTER_DATE=" + dateStr,

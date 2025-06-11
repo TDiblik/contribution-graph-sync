@@ -19,8 +19,9 @@ type IEnvData struct {
 
 var EnvData IEnvData
 
-var DATE_TIME_FORMAT = ""
-var DATE_FORMAT = ""
+var PragueDateLoc *time.Location
+
+const DateDateFormatLayout = "2006-01-02 15:04:05 CET"
 
 func SetupENV(env_files ...string) error {
 	log.Println("Setting up env variables: start")
@@ -34,6 +35,12 @@ func SetupENV(env_files ...string) error {
 	EnvData.GL_TARGET_SYNC_REPO = getEnvKeyOrPanic("GL_TARGET_SYNC_REPO")
 	if stat, err := os.Stat(EnvData.GL_TARGET_SYNC_REPO); err != nil || !stat.IsDir() {
 		return fmt.Errorf("GL_TARGET_SYNC_REPO does not exist: %v", err)
+	}
+
+	// just to make sure we can convert from UTC to CET
+	PragueDateLoc, err = time.LoadLocation("Europe/Prague")
+	if err != nil {
+		return fmt.Errorf("unable to load Europe/Prague time location: %v", err)
 	}
 
 	log.Println("Setting up env variables: end")
@@ -74,4 +81,8 @@ func SetLastRecordedDate(newDate time.Time) error {
 
 func lastRecordedDateFileName() string {
 	return path.Join(EnvData.GL_TARGET_SYNC_REPO, "last-recorded-date.txt")
+}
+
+func UtcToCet(date time.Time) time.Time {
+	return date.In(PragueDateLoc)
 }
