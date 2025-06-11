@@ -30,7 +30,7 @@ func main() {
 
 		for _, event := range *events {
 			switch {
-			// todo: nějak přidat možnost že to ukáže PRs který jsou úspěšně zamergovaný
+			// todo: ADD an option to log PRs the user has merged.
 			case event.ActionName == "pushed new" && event.PushData.CommitCount == 1:
 				CreateGitCommit("pushed new branch", event.CreatedAt)
 			case event.ActionName == "pushed to" && event.PushData.CommitCount == 1:
