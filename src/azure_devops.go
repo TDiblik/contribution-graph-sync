@@ -88,7 +88,7 @@ func (source *AzureDevOpsSource) GetActivities(fromDate time.Time) ([]SyncActivi
 			seenCommits[key] = struct{}{}
 
 			activities = append(activities, newSyncActivity(
-				fmt.Sprintf("created a commit in %s/%s", res.repo.Project.Name, res.repo.Name),
+				"created a commit",
 				commit.Author.Date,
 				commit.Author.Date,
 			))
@@ -120,7 +120,7 @@ func (source *AzureDevOpsSource) GetActivities(fromDate time.Time) ([]SyncActivi
 			}
 
 			activities = append(activities, newSyncActivity(
-				fmt.Sprintf("opened pull request in %s/%s", pullRequest.Repository.Project.Name, pullRequest.Repository.Name),
+				"opened pull request",
 				pullRequest.CreationDate,
 				pullRequest.CreationDate,
 			))
