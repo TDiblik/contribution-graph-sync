@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path"
 	"strings"
@@ -13,8 +12,10 @@ import (
 )
 
 type IEnvData struct {
-	GL_API_TOKEN        string
-	GL_TARGET_SYNC_REPO string
+	TARGET_SYNC_REPO  string
+	GL_API_TOKEN      string
+	AZDO_ORGANIZATION string
+	AZDO_AUTHOR       string
 }
 
 var EnvData IEnvData
@@ -24,17 +25,23 @@ var PragueDateLoc *time.Location
 const DateDateFormatLayout = "2006-01-02 15:04:05 CET"
 
 func SetupENV(env_files ...string) error {
-	log.Println("Setting up env variables: start")
-
 	err := godotenv.Load(env_files...)
 	if err != nil {
 		return fmt.Errorf("Unable to load .env file: %v", err)
 	}
 
-	EnvData.GL_API_TOKEN = getEnvKeyOrPanic("GL_API_TOKEN")
-	EnvData.GL_TARGET_SYNC_REPO = getEnvKeyOrPanic("GL_TARGET_SYNC_REPO")
-	if stat, err := os.Stat(EnvData.GL_TARGET_SYNC_REPO); err != nil || !stat.IsDir() {
-		return fmt.Errorf("GL_TARGET_SYNC_REPO does not exist: %v", err)
+	EnvData.GL_API_TOKEN = getOptionalEnvKey("GL_API_TOKEN")
+	EnvData.AZDO_ORGANIZATION = getOptionalEnvKey("AZDO_ORGANIZATION")
+	EnvData.AZDO_AUTHOR = getOptionalEnvKey("AZDO_AUTHOR")
+	EnvData.TARGET_SYNC_REPO = getOptionalEnvKey("TARGET_SYNC_REPO")
+	if EnvData.TARGET_SYNC_REPO == "" {
+		return fmt.Errorf("TARGET_SYNC_REPO is required")
+	}
+	if stat, err := os.Stat(EnvData.TARGET_SYNC_REPO); err != nil || !stat.IsDir() {
+		return fmt.Errorf("TARGET_SYNC_REPO does not exist: %v", err)
+	}
+	if EnvData.GL_API_TOKEN == "" && EnvData.AZDO_ORGANIZATION == "" {
+		return fmt.Errorf("no sync providers configured (set GL_API_TOKEN or AZDO_ORGANIZATION)")
 	}
 
 	// just to make sure we can convert from UTC to CET
@@ -43,22 +50,26 @@ func SetupENV(env_files ...string) error {
 		return fmt.Errorf("unable to load Europe/Prague time location: %v", err)
 	}
 
-	log.Println("Setting up env variables: end")
 	return nil
 }
 
-func getEnvKeyOrPanic(key string) string {
-	val := os.Getenv(key)
-	if len(val) == 0 {
-		log.Fatal("Error loading ", key)
-	}
-	return val
+func getOptionalEnvKey(key string) string {
+	return strings.TrimSpace(os.Getenv(key))
 }
 
-func GetLastRecordedDate() (*time.Time, error) {
-	filePath := lastRecordedDateFileName()
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func GetLastRecordedDate(sourceName string) (*time.Time, error) {
+	filePath := lastRecordedDateFileName(sourceName)
 	if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
-		final := time.Now().AddDate(-3, -6, 0) // even tho Gitlab officially says it only keeps records 3 years old.
+		final := time.Now().AddDate(-18, -6, 0) // even tho Gitlab officially says it only keeps records 3 years old.
 		return &final, nil
 	}
 
@@ -71,16 +82,17 @@ func GetLastRecordedDate() (*time.Time, error) {
 	return &date, err
 }
 
-func SetLastRecordedDate(newDate time.Time) error {
+func SetLastRecordedDate(sourceName string, newDate time.Time) error {
 	dateStr := newDate.Format(time.RFC3339)
-	if err := os.WriteFile(lastRecordedDateFileName(), []byte(dateStr), 0644); err != nil {
+	if err := os.WriteFile(lastRecordedDateFileName(sourceName), []byte(dateStr), 0644); err != nil {
 		return err
 	}
 	return nil
 }
 
-func lastRecordedDateFileName() string {
-	return path.Join(EnvData.GL_TARGET_SYNC_REPO, "last-recorded-date.txt")
+func lastRecordedDateFileName(sourceName string) string {
+	fileName := fmt.Sprintf("last-recorded-date-%s.txt", strings.ToLower(strings.ReplaceAll(sourceName, " ", "-")))
+	return path.Join(EnvData.TARGET_SYNC_REPO, fileName)
 }
 
 func UtcToCet(date time.Time) time.Time {

@@ -25,7 +25,7 @@ func CreateGitCommit(message string, dateRaw time.Time) {
 	date := UtcToCet(dateRaw)
 
 	var fileHandle *os.File
-	filePath := path.Join(EnvData.GL_TARGET_SYNC_REPO, date.Format(time.DateOnly)+".txt")
+	filePath := path.Join(EnvData.TARGET_SYNC_REPO, date.Format(time.DateOnly)+".txt")
 	if _, err := os.Stat(filePath); errors.Is(err, os.ErrNotExist) {
 		fileHandle, err = os.Create(filePath)
 		if err != nil {
@@ -42,15 +42,11 @@ func CreateGitCommit(message string, dateRaw time.Time) {
 	if _, err := fileHandle.Write(fmt.Appendln(nil, date.Format(DateDateFormatLayout)+":", message)); err != nil {
 		log.Fatal(err)
 	}
-	if err := SetLastRecordedDate(date); err != nil {
-		log.Fatal(err)
-	}
-
 	dateStr := date.Format(time.RFC3339)
-	runGit([]string{"add", "."}, nil, EnvData.GL_TARGET_SYNC_REPO)
+	runGit([]string{"add", "."}, nil, EnvData.TARGET_SYNC_REPO)
 	runGit([]string{"commit", "-m", fmt.Sprintf("[sync] %s", date.Format(DateDateFormatLayout))},
 		[]string{
 			"GIT_AUTHOR_DATE=" + dateStr,
 			"GIT_COMMITTER_DATE=" + dateStr,
-		}, EnvData.GL_TARGET_SYNC_REPO)
+		}, EnvData.TARGET_SYNC_REPO)
 }

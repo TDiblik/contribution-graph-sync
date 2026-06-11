@@ -4,10 +4,77 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
 )
+
+type GitLabSource struct {
+	user *UserInfo
+}
+
+func NewGitLabSource() (*GitLabSource, error) {
+	user, err := GetUserInfo()
+	if err != nil {
+		return nil, err
+	}
+	return &GitLabSource{user: user}, nil
+}
+
+func (source *GitLabSource) Name() string {
+	return "GitLab"
+}
+
+func (source *GitLabSource) GetActivities(fromDate time.Time) ([]SyncActivity, error) {
+	events, err := GetEvents(source.user.Id, fromDate)
+	if err != nil {
+		return nil, err
+	}
+
+	var activities []SyncActivity
+	for _, event := range *events {
+		switch {
+		// todo: ADD an option to log PRs the user has merged.
+		case event.ActionName == "pushed new" && event.PushData.CommitCount == 1:
+			activities = append(activities, newSyncActivity("pushed new branch", event.CreatedAt, event.CreatedAt))
+		case event.ActionName == "pushed to" && event.PushData.CommitCount == 1:
+			activities = append(activities, newSyncActivity("created a commit", event.CreatedAt, event.CreatedAt))
+		case event.ActionName == "pushed new":
+			commitActivities, err := source.getMultipleCommitActivities(event)
+			if err != nil {
+				return nil, err
+			}
+			activities = append(activities, commitActivities...)
+			activities = append(activities, newSyncActivity("pushed new branch", event.CreatedAt, event.CreatedAt))
+		case event.ActionName == "pushed to":
+			commitActivities, err := source.getMultipleCommitActivities(event)
+			if err != nil {
+				return nil, err
+			}
+			activities = append(activities, commitActivities...)
+		case event.ActionName == "opened" && event.TargetType == "MergeRequest":
+			activities = append(activities, newSyncActivity("opened merge request", event.CreatedAt, event.CreatedAt))
+		default:
+			log.Println("not handled: ", event.ActionName)
+		}
+	}
+
+	return activities, nil
+}
+
+func (source *GitLabSource) getMultipleCommitActivities(event ProjectEvent) ([]SyncActivity, error) {
+	commitsBetween, err := GetCommitsBetween(event, source.user.CommitEmail)
+	if err != nil {
+		return nil, err
+	}
+
+	var activities []SyncActivity
+	for _, commit := range *commitsBetween {
+		activities = append(activities, newSyncActivity("created a commit", commit.AuthoredDate, event.CreatedAt))
+	}
+	return activities, nil
+}
 
 type UserInfo struct {
 	Id          uint32 `json:"id"`

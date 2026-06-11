@@ -10,55 +10,49 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	user, err := GetUserInfo()
+	sources, err := GetActivitySources()
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	for {
-		lastRecordedDate, err := GetLastRecordedDate()
-		if err != nil {
-			log.Fatalln(err)
-		}
+		syncedAny := false
+		for _, source := range sources {
+			lastRecordedDate, err := GetLastRecordedDate(source.Name())
+			if err != nil {
+				log.Fatalln(err)
+			}
 
-		events, err := GetEvents(user.Id, *lastRecordedDate)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		if len(*events) == 0 {
-			return
-		}
+			activities, err := source.GetActivities(*lastRecordedDate)
+			if err != nil {
+				log.Fatalln(err)
+			}
+			if len(activities) == 0 {
+				continue
+			}
 
-		for _, event := range *events {
-			switch {
-			// todo: ADD an option to log PRs the user has merged.
-			case event.ActionName == "pushed new" && event.PushData.CommitCount == 1:
-				CreateGitCommit("pushed new branch", event.CreatedAt)
-			case event.ActionName == "pushed to" && event.PushData.CommitCount == 1:
-				CreateGitCommit("created a commit", event.CreatedAt)
-			case event.ActionName == "pushed new":
-				HandleMultipleCommits(event, user.CommitEmail)
-				CreateGitCommit("pushed new branch", event.CreatedAt)
-			case event.ActionName == "pushed to":
-				HandleMultipleCommits(event, user.CommitEmail)
-			case event.ActionName == "opened" && event.TargetType == "MergeRequest":
-				CreateGitCommit("opened merge request", event.CreatedAt)
-			default:
-				log.Println("not handled: ", event.ActionName)
+			processed := 0
+			for _, activity := range activities {
+				if !activity.CursorDate.After(*lastRecordedDate) {
+					continue
+				}
+				CreateGitCommit(activity.Message, activity.CommitDate)
+				if err := SetLastRecordedDate(source.Name(), activity.CursorDate); err != nil {
+					log.Fatalln(err)
+				}
+				processed++
+			}
+			if processed > 0 {
+				log.Printf("Synced %d activities from %s\n", processed, source.Name())
+				syncedAny = true
 			}
 		}
+
+		if !syncedAny {
+			log.Println("All sources are fully synced. Exiting.")
+			break
+		}
+
 		time.Sleep(time.Millisecond * 500) // give the API some rest :D (prevents rate-limiting + random HTTP 500 codes)
 	}
-}
-
-func HandleMultipleCommits(event ProjectEvent, commiterEmail string) {
-	commitsBetween, err := GetCommitsBetween(event, commiterEmail)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	for _, commit := range *commitsBetween {
-		CreateGitCommit("created a commit", commit.AuthoredDate)
-	}
-	SetLastRecordedDate(event.CreatedAt)
-	time.Sleep(time.Millisecond * 500) // give the API some rest :D (prevents rate-limiting + random HTTP 500 codes)
 }
